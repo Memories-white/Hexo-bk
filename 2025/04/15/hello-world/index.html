@@ -255,7 +255,7 @@ btf.addGlobalFn('pjaxSend', () => {
   const initArtalk = (el = document, pageKey = location.pathname) => {
     artalkItem = Artalk.init({
       el: el.querySelector('#artalk-wrap'),
-      server: 'https://172.17.0.2:23366',
+      server: '172.17.0.2',
       site: 'Memries White 的博客',
       darkMode: document.documentElement.getAttribute('data-theme') === 'dark',
       ...option,
