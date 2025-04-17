@@ -272,8 +272,8 @@ btf.addGlobalFn('pjaxSend', () => {
   const initArtalk = (el = document, pageKey = location.pathname) => {
     artalkItem = Artalk.init({
       el: el.querySelector('#artalk-wrap'),
-      server: '182.92.151.164',
-      site: 'Memories White 的博客',
+      server: 'www.zfps,asia',
+      site: 'artalk',
       darkMode: document.documentElement.getAttribute('data-theme') === 'dark',
       ...option,
       pageKey: isShuoshuo ? pageKey : (option && option.pageKey) || pageKey
