@@ -357,7 +357,7 @@ btf.addGlobalFn('pjaxSend', () => {
   const initArtalk = (el = document, pageKey = location.pathname) => {
     artalkItem = Artalk.init({
       el: el.querySelector('#artalk-wrap'),
-      server: 'zfps.asia',
+      server: 'https://zfps.asia',
       site: 'Memries White 的博客',
       darkMode: document.documentElement.getAttribute('data-theme') === 'dark',
       ...option,
