@@ -1,0 +1,473 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>使用CentOS7实现通过NFS Server实现web01、web02站点的数据共享 | Memories White's Blog</title><meta name="author" content="Memories White"><meta name="copyright" content="Memories White"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="说明全部虚拟机只有两个步骤相同操作,四台虚拟机进行换源操作并关闭防火墙.实验准备中表格中的节点名称可以按照自己的需求更改,IP 地址视情况更改,Node2-3 为部署 web 站点,这里只展示一台的步骤,两台的步骤相同. 实验图  实验准备实验需准备四台虚拟机,以下视情况进行更改.   节点名称 IP 地址 说明    node01 192.168.100.134 负载均衡器（部署 Nginx 反">
+<meta property="og:type" content="article">
+<meta property="og:title" content="使用CentOS7实现通过NFS Server实现web01、web02站点的数据共享">
+<meta property="og:url" content="http://zfps.asia/2025/06/09/CentOS7_experiment/index.html">
+<meta property="og:site_name" content="Memories White&#39;s Blog">
+<meta property="og:description" content="说明全部虚拟机只有两个步骤相同操作,四台虚拟机进行换源操作并关闭防火墙.实验准备中表格中的节点名称可以按照自己的需求更改,IP 地址视情况更改,Node2-3 为部署 web 站点,这里只展示一台的步骤,两台的步骤相同. 实验图  实验准备实验需准备四台虚拟机,以下视情况进行更改.   节点名称 IP 地址 说明    node01 192.168.100.134 负载均衡器（部署 Nginx 反">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://t.alcy.cc/fj">
+<meta property="article:published_time" content="2025-06-09T06:25:22.000Z">
+<meta property="article:modified_time" content="2025-06-09T08:50:18.663Z">
+<meta property="article:author" content="Memories White">
+<meta property="article:tag" content="教程">
+<meta property="article:tag" content="CentOS7">
+<meta property="article:tag" content="实验">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://t.alcy.cc/fj"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "使用CentOS7实现通过NFS Server实现web01、web02站点的数据共享",
+  "url": "http://zfps.asia/2025/06/09/CentOS7_experiment/",
+  "image": "https://t.alcy.cc/fj",
+  "datePublished": "2025-06-09T06:25:22.000Z",
+  "dateModified": "2025-06-09T08:50:18.663Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "Memories White",
+      "url": "http://zfps.asia/"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/LogosBrowserling.svg"><link rel="canonical" href="http://zfps.asia/2025/06/09/CentOS7_experiment/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/node-snackbar/dist/snackbar.min.css" media="print" onload="this.media='all'"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        if (!ttl) return
+        const expiry = Date.now() + ttl * 86400000
+        localStorage.setItem(key, JSON.stringify({ value, expiry }))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return undefined
+        const { value, expiry } = JSON.parse(itemStr)
+        if (Date.now() > expiry) {
+          localStorage.removeItem(key)
+          return undefined
+        }
+        return value
+      }
+    }
+
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        Object.entries(attr).forEach(([key, val]) => script.setAttribute(key, val))
+        script.onload = script.onreadystatechange = () => {
+          if (!script.readyState || /loaded|complete/.test(script.readyState)) resolve()
+        }
+        script.onerror = reject
+        document.head.appendChild(script)
+      }),
+      getCSS: (url, id) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onload = link.onreadystatechange = () => {
+          if (!link.readyState || /loaded|complete/.test(link.readyState)) resolve()
+        }
+        link.onerror = reject
+        document.head.appendChild(link)
+      }),
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
+
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: {"defaultEncoding":2,"translateDelay":0,"msgToTraditionalChinese":"繁","msgToSimplifiedChinese":"简"},
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":200,"highlightFullpage":true,"highlightMacStyle":true},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: {"chs_to_cht":"已切换为繁体中文","cht_to_chs":"已切换为简体中文","day_to_night":"已切换为深色模式","night_to_day":"已切换为浅色模式","bgLight":"#49b1f5","bgDark":"#1f1f1f","position":"bottom-left"},
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: true,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '使用CentOS7实现通过NFS Server实现web01、web02站点的数据共享',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><link rel="stylesheet" href="/css/style.css?1"><link rel="stylesheet" href="/css/progress_bar.css?1"><meta name="generator" content="Hexo 7.3.0"></head><body><div id="loading-box" onclick="document.getElementById(&quot;loading-box&quot;).classList.add(&quot;loaded&quot;)"><div class="loading-bg"><div class="loading-img"></div><div class="loading-image-dot"></div></div></div><script>const preloader = {
+  endLoading: () => {
+    document.body.style.overflow = 'auto';
+    document.getElementById('loading-box').classList.add("loaded")
+  },
+  initLoading: () => {
+    document.body.style.overflow = '';
+    document.getElementById('loading-box').classList.remove("loaded")
+
+  }
+}
+window.addEventListener('load',()=> { preloader.endLoading() })
+
+if (false) {
+  document.addEventListener('pjax:send', () => { preloader.initLoading() })
+  document.addEventListener('pjax:complete', () => { preloader.endLoading() })
+}</script><script>window.paceOptions = {
+  restartOnPushState: false
+}
+
+btf.addGlobalFn('pjaxSend', () => {
+  Pace.restart()
+}, 'pace_restart')
+
+</script><link rel="stylesheet" href="/css/progress_bar.css"/><script src="https://cdn.jsdelivr.net/npm/pace-js/pace.min.js"></script><div id="web_bg" style="background-image: url(/img/background.jpg);"></div><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/avatar.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="site-data text-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">4</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">6</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">6</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><span class="site-page group"><i class="fa-fw fas fa-list"></i><span> 列表</span><i class="fas fa-chevron-down"></i></span><ul class="menus_item_child"><li><a class="site-page child" href="/music/"><i class="fa-fw fas fa-music"></i><span> 音乐</span></a></li><li><a class="site-page child" href="/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></li><li><a class="site-page child" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 时间轴</span></a></li><li><a class="site-page child" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></li><li><a class="site-page child" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></li></ul></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-heart"></i><span> 关于</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url(https://t.alcy.cc/fj);"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><span class="site-name">Memories White's Blog</span></a><a class="nav-page-title" href="/"><span class="site-name">使用CentOS7实现通过NFS Server实现web01、web02站点的数据共享</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><span class="site-page group"><i class="fa-fw fas fa-list"></i><span> 列表</span><i class="fas fa-chevron-down"></i></span><ul class="menus_item_child"><li><a class="site-page child" href="/music/"><i class="fa-fw fas fa-music"></i><span> 音乐</span></a></li><li><a class="site-page child" href="/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></li><li><a class="site-page child" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 时间轴</span></a></li><li><a class="site-page child" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></li><li><a class="site-page child" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></li></ul></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-heart"></i><span> 关于</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav><div id="post-info"><h1 class="post-title">使用CentOS7实现通过NFS Server实现web01、web02站点的数据共享</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2025-06-09T06:25:22.000Z" title="发表于 2025-06-09 14:25:22">2025-06-09</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2025-06-09T08:50:18.663Z" title="更新于 2025-06-09 16:50:18">2025-06-09</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E6%95%99%E7%A8%8B/">教程</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E6%95%99%E7%A8%8B/CentOS7/">CentOS7</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E6%95%99%E7%A8%8B/CentOS7/%E5%AE%9E%E9%AA%8C/">实验</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="leancloud_visitors" id="/2025/06/09/CentOS7_experiment/" data-flag-title="使用CentOS7实现通过NFS Server实现web01、web02站点的数据共享"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">浏览量:</span><span class="leancloud-visitors-count"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container"><div id="post-outdate-notice" data="{&quot;limitDay&quot;:365,&quot;messagePrev&quot;:&quot;已经过了&quot;,&quot;messageNext&quot;:&quot;天自上次更新，文章内容可能已过时。&quot;,&quot;postUpdate&quot;:&quot;2025-06-09 16:50:18&quot;}" hidden></div><h3 id="说明"><a href="#说明" class="headerlink" title="说明"></a>说明</h3><p>全部虚拟机只有两个步骤相同操作,四台虚拟机进行换源操作并关闭防火墙.实验准备中表格中的节点名称可以按照自己的需求更改,IP 地址视情况更改,Node2-3 为部署 web 站点,这里只展示一台的步骤,两台的步骤相同.</p>
+<h4 id="实验图"><a href="#实验图" class="headerlink" title="实验图"></a>实验图</h4><p><img src="/img/%E6%95%99%E7%A8%8B/CentOS7_experiment/experiment.png" alt="scp"></p>
+<hr>
+<h3 id="实验准备"><a href="#实验准备" class="headerlink" title="实验准备"></a>实验准备</h3><h4 id="实验需准备四台虚拟机-以下视情况进行更改"><a href="#实验需准备四台虚拟机-以下视情况进行更改" class="headerlink" title="实验需准备四台虚拟机,以下视情况进行更改."></a>实验需准备四台虚拟机,以下视情况进行更改.</h4><table>
+<thead>
+<tr>
+<th>节点名称</th>
+<th>IP 地址</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>node01</td>
+<td>192.168.100.134</td>
+<td>负载均衡器（部署 Nginx 反向代理）</td>
+</tr>
+<tr>
+<td>node02</td>
+<td>192.168.100.135</td>
+<td>Web 站点 1（Nginx + NFS 挂载）</td>
+</tr>
+<tr>
+<td>node03</td>
+<td>192.168.100.136</td>
+<td>Web 站点 2（Nginx + NFS 挂载）</td>
+</tr>
+<tr>
+<td>node04</td>
+<td>192.168.100.137</td>
+<td>NFS 服务器（提供共享存储）</td>
+</tr>
+</tbody></table>
+<h3 id="Node1-4-换源操作-并关闭防火墙"><a href="#Node1-4-换源操作-并关闭防火墙" class="headerlink" title="Node1-4 换源操作,并关闭防火墙"></a>Node1-4 换源操作,并关闭防火墙</h3><p>这里的操作是需要对四台虚拟机进行的操作</p>
+<h4 id="备份默认源"><a href="#备份默认源" class="headerlink" title="备份默认源"></a>备份默认源</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">sudo</span> <span class="built_in">cp</span> /etc/yum.repos.d/CentOS-Base.repo /etc/yum.repos.d/CentOS-Base.repo.bak</span><br></pre></td></tr></table></figure>
+
+<h4 id="进行换源操作-这里使用阿里云源-需要使用其他源也可以换成别的"><a href="#进行换源操作-这里使用阿里云源-需要使用其他源也可以换成别的" class="headerlink" title="进行换源操作,这里使用阿里云源,需要使用其他源也可以换成别的"></a>进行换源操作,这里使用阿里云源,需要使用其他源也可以换成别的</h4><p><code>阿里云源</code></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">sudo</span> wget -O /etc/yum.repos.d/CentOS-Base.repo http://mirrors.aliyun.com/repo/Centos-7.repo</span><br></pre></td></tr></table></figure>
+
+<p><code>清华大学源</code></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">sudo</span> wget -O /etc/yum.repos.d/CentOS-Base.repo https://mirrors.tuna.tsinghua.edu.cn/repo/Centos-7.repo</span><br></pre></td></tr></table></figure>
+
+<p><code>网易源</code></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">sudo</span> wget -O /etc/yum.repos.d/CentOS-Base.repo http://mirrors.163.com/.help/CentOS7-Base-163.repo</span><br></pre></td></tr></table></figure>
+
+<p><code>中科大源</code></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">sudo</span> wget -O /etc/yum.repos.d/CentOS-Base.repo http://mirrors.ustc.edu.cn/centos/7/os/x86_64/</span><br></pre></td></tr></table></figure>
+
+<h4 id="清理-yum-源"><a href="#清理-yum-源" class="headerlink" title="清理 yum 源"></a>清理 yum 源</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">sudo</span> yum clean all</span><br><span class="line"><span class="built_in">sudo</span> yum makecache</span><br></pre></td></tr></table></figure>
+
+<h4 id="验证是否有效"><a href="#验证是否有效" class="headerlink" title="验证是否有效"></a>验证是否有效</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">sudo</span> yum repolist</span><br></pre></td></tr></table></figure>
+
+<h4 id="关闭防火墙"><a href="#关闭防火墙" class="headerlink" title="关闭防火墙"></a>关闭防火墙</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">systemctl stop firewalld.service</span><br></pre></td></tr></table></figure>
+
+<h3 id="Node4-操作"><a href="#Node4-操作" class="headerlink" title="Node4 操作"></a>Node4 操作</h3><h4 id="安装-NFS-服务"><a href="#安装-NFS-服务" class="headerlink" title="安装 NFS 服务"></a>安装 NFS 服务</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">yum install -y nfs-utils rpcbind</span><br></pre></td></tr></table></figure>
+
+<h4 id="创建共享目录并设置权限"><a href="#创建共享目录并设置权限" class="headerlink" title="创建共享目录并设置权限"></a>创建共享目录并设置权限</h4><p>创建共享目录，用于存放 Web 站点需共享的数据</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">mkdir</span> -p /data/nfs_share</span><br><span class="line"><span class="built_in">chown</span> -R nfsnobody:nfsnobody /data/nfs_share</span><br><span class="line"><span class="built_in">chmod</span> -R 755 /data/nfs_share</span><br></pre></td></tr></table></figure>
+
+<h4 id="配置-NFS-共享规则"><a href="#配置-NFS-共享规则" class="headerlink" title="配置 NFS 共享规则"></a>配置 NFS 共享规则</h4><p>编辑 &#x2F;etc&#x2F;exports 文件，添加共享配置，允许指定网段访问共享目录</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">echo</span> <span class="string">&quot;/data/nfs_share 192.168.100.0/24(rw,sync,no_root_squash)&quot;</span> &gt;&gt; /etc/exports</span><br></pre></td></tr></table></figure>
+
+<p>其中，192.168.100.0&#x2F;24 表示允许该网段内节点访问，rw 为读写权限，sync 保障数据同步写入，no_root_squash 允许客户端以 root 身份访问（生产环境可按需调整为更严格权限 ）</p>
+<h4 id="启动服务并设置开机自启"><a href="#启动服务并设置开机自启" class="headerlink" title="启动服务并设置开机自启"></a>启动服务并设置开机自启</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">systemctl start rpcbind nfs</span><br><span class="line">systemctl <span class="built_in">enable</span> rpcbind nfs</span><br></pre></td></tr></table></figure>
+
+<h4 id="验证-NFS-服务是否生效"><a href="#验证-NFS-服务是否生效" class="headerlink" title="验证 NFS 服务是否生效"></a>验证 NFS 服务是否生效</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">showmount -e localhost</span><br><span class="line"><span class="comment"># 正常输出示例：</span></span><br><span class="line"><span class="comment"># Export list for localhost:</span></span><br><span class="line"><span class="comment"># /data/nfs_share 192.168.100.0/24</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="Node2-3-部署-Web-服务（数据同步依赖-NFS-挂载-）"><a href="#Node2-3-部署-Web-服务（数据同步依赖-NFS-挂载-）" class="headerlink" title="Node2-3 部署 Web 服务（数据同步依赖 NFS 挂载 ）"></a>Node2-3 部署 Web 服务（数据同步依赖 NFS 挂载 ）</h3><h4 id="安装-Nginx-所需要的环境"><a href="#安装-Nginx-所需要的环境" class="headerlink" title="安装 Nginx 所需要的环境"></a>安装 Nginx 所需要的环境</h4><p>由于 CentOS7 没办法使用命令方式直接安装,只能使用编译安装,所以这里使用的是编译安装,其他相同或版本默认安装路径不同,如果使用包管理器安装 Nginx 路径为:<code>/usr/share/nginx/</code>,使用编译安装的路径为:<code>/usr/local/nginx</code></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="comment">#安装 nginx 需要先将官网下载的源码进行编译，编译依赖 gcc 环境</span></span><br><span class="line">yum install gcc-c++</span><br><span class="line"><span class="comment">#pcre是一个perl库，包括perl兼容的正则表达式库，nginx的http模块使用pcre来解析正则表达式，所以需要安装pcre库</span></span><br><span class="line">yum install -y pcre pcre-devel</span><br><span class="line"><span class="comment">#zlib库提供了很多种压缩和解压缩方式nginx使用zlib对http包的内容进行gzip，所以需要安装</span></span><br><span class="line">yum install -y zlib zlib-devel</span><br><span class="line"><span class="comment">#nginx 不仅支持 http 协议，还支持 https（即在ssl协议上传输http），所以需要在 Centos 安装 OpenSSL 库</span></span><br><span class="line">yum install -y openssl openssl-devel</span><br></pre></td></tr></table></figure>
+
+<h4 id="安装-Nginx"><a href="#安装-Nginx" class="headerlink" title="安装 Nginx"></a>安装 Nginx</h4><p>这里使用的是编译安装,需要先在官网下载包到本地解压进行编译安装</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">#进入usr下的local目录</span></span><br><span class="line"><span class="built_in">cd</span> usr/local</span><br><span class="line"><span class="comment">#在local目录下创建 nginx 文件夹</span></span><br><span class="line"><span class="built_in">mkdir</span> nginx</span><br><span class="line"><span class="comment">#进入nginx目录</span></span><br><span class="line"><span class="built_in">cd</span> nginx</span><br></pre></td></tr></table></figure>
+
+<p>通过 wget 下载 nginx 安装包</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">wget https://nginx.org/download/nginx-1.22.1.tar.gz</span><br></pre></td></tr></table></figure>
+
+<p>解压并加入目录</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">tar -zxvf nginx-1.22.1.tar.gz</span><br><span class="line"><span class="built_in">cd</span> nginx-1.22.1</span><br></pre></td></tr></table></figure>
+
+<p>配置</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">./configure --prefix=/usr/local/nginx --with-http_stub_status_module --with-http_ssl_module</span><br></pre></td></tr></table></figure>
+
+<p>编译安装</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">#编译</span></span><br><span class="line">make</span><br><span class="line"><span class="comment">#安装</span></span><br><span class="line">make install</span><br></pre></td></tr></table></figure>
+
+<p>启动 nginx 服务,附关闭命令</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">###启动服务</span></span><br><span class="line"><span class="comment">#需要先进入sbin目录下</span></span><br><span class="line"><span class="built_in">cd</span> /usr/local/nginx/sbin</span><br><span class="line"><span class="comment">#启动nginx服务</span></span><br><span class="line">./nginx</span><br><span class="line"></span><br><span class="line"><span class="comment">###关闭服务</span></span><br><span class="line"><span class="comment">#需要先进入sbin目录下</span></span><br><span class="line"><span class="built_in">cd</span> /usr/local/nginx/sbin</span><br><span class="line"><span class="comment">#关闭nginx服务</span></span><br><span class="line">./nginx -s stop</span><br></pre></td></tr></table></figure>
+
+<p>配置 nginx 配置环境变量</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">vim /etc/profile</span><br><span class="line"></span><br><span class="line"><span class="comment">####在最后一行添加</span></span><br><span class="line"><span class="built_in">export</span> PATH=<span class="variable">$PATH</span>:/usr/local/nginx/sbin</span><br></pre></td></tr></table></figure>
+
+<p>定位到服务目录下并使配置生效</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cd</span> /usr/local/nginx/sbin</span><br><span class="line"><span class="built_in">source</span> /etc/profile</span><br></pre></td></tr></table></figure>
+
+<p>浏览器输入 Node4 服务器 ip 出现如下画面为成功<br><img src="/img/%E6%95%99%E7%A8%8B/CentOS7_experiment/node4success.png" alt="scp"></p>
+<h4 id="Node2-3-部署-Web-站点"><a href="#Node2-3-部署-Web-站点" class="headerlink" title="Node2-3 部署 Web 站点"></a>Node2-3 部署 Web 站点</h4><h5 id="挂载-NFS-共享目录"><a href="#挂载-NFS-共享目录" class="headerlink" title="挂载 NFS 共享目录"></a>挂载 NFS 共享目录</h5><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">#安装 NFS 服务</span></span><br><span class="line">yum install -y nfs-utils</span><br><span class="line"></span><br><span class="line"><span class="comment"># 手动挂载（测试用）</span></span><br><span class="line">mount -t nfs 192.168.100.137:/data/nfs_share /usr/share/nginx/html</span><br><span class="line"></span><br><span class="line"><span class="comment"># 设置开机自动挂载，编辑 /etc/fstab 文件</span></span><br><span class="line"><span class="built_in">echo</span> <span class="string">&quot;192.168.100.137:/data/nfs_share /usr/share/nginx/html nfs defaults 0 0&quot;</span> &gt;&gt; /etc/fstab</span><br><span class="line">mount -a  <span class="comment"># 使挂载配置立即生效，无报错则挂载成功</span></span><br></pre></td></tr></table></figure>
+
+<h5 id="启动-Nginx-并设置开机自启"><a href="#启动-Nginx-并设置开机自启" class="headerlink" title="启动 Nginx 并设置开机自启"></a>启动 Nginx 并设置开机自启</h5><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">systemctl start nginx</span><br><span class="line">systemctl <span class="built_in">enable</span> nginx</span><br></pre></td></tr></table></figure>
+
+<h5 id="验证数据同步"><a href="#验证数据同步" class="headerlink" title="验证数据同步"></a>验证数据同步</h5><p>在 NFS 服务端（node04 节点 ）的共享目录创建测试文件</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">echo</span> <span class="string">&quot;Hello from NFS Share!&quot;</span> &gt; /data/nfs_share/index.html</span><br></pre></td></tr></table></figure>
+
+<p>在 node02、node03 节点，通过 curl 命令访问本地 Nginx 服务，验证数据是否同步</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">curl 127.0.0.1</span><br><span class="line"><span class="comment"># 应输出 &quot;Hello from NFS Share!&quot;，说明数据同步成功</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="Node1-部署负载均衡（采用-Nginx-反向代理-）"><a href="#Node1-部署负载均衡（采用-Nginx-反向代理-）" class="headerlink" title="Node1 部署负载均衡（采用 Nginx 反向代理 ）"></a>Node1 部署负载均衡（采用 Nginx 反向代理 ）</h3><h4 id="安装-Nginx-这里安装-Nginx-同上面的-Node2-3-操作相同故不演示"><a href="#安装-Nginx-这里安装-Nginx-同上面的-Node2-3-操作相同故不演示" class="headerlink" title="安装 Nginx,这里安装 Nginx 同上面的 Node2-3 操作相同故不演示"></a>安装 Nginx,这里安装 Nginx 同上面的 Node2-3 操作相同故不演示</h4><h4 id="配置负载均衡规则"><a href="#配置负载均衡规则" class="headerlink" title="配置负载均衡规则"></a>配置负载均衡规则</h4><p>编辑 &#x2F;usr&#x2F;local&#x2F;nginx&#x2F;conf.d&#x2F;loadbalance.conf 文件（若无则新建 ），添加负载均衡配置</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">upstream web_servers &#123;</span><br><span class="line">    server 192.168.100.135;  <span class="comment"># Web01 节点（node02）</span></span><br><span class="line">    server 192.168.100.136;  <span class="comment"># Web02 节点（node03）</span></span><br><span class="line">    <span class="comment"># 可按需添加负载均衡策略，如 weight（权重）、ip_hash（会话保持）等，默认轮询策略</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">server &#123;</span><br><span class="line">    listen 80;</span><br><span class="line">    server_name localhost;</span><br><span class="line"></span><br><span class="line">    location / &#123;</span><br><span class="line">        proxy_pass http://web_servers;</span><br><span class="line">        proxy_set_header Host <span class="variable">$host</span>;</span><br><span class="line">        proxy_set_header X-Real-IP <span class="variable">$remote_addr</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>重启 Nginx</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">/usr/local/nginx/sbin/nginx -s reload</span><br></pre></td></tr></table></figure>
+
+<h4 id="启动-Nginx-并验证"><a href="#启动-Nginx-并验证" class="headerlink" title="启动 Nginx 并验证"></a>启动 Nginx 并验证</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">systemctl start nginx</span><br><span class="line">systemctl <span class="built_in">enable</span> nginx</span><br><span class="line"></span><br><span class="line">nginx -t  <span class="comment"># 检查配置语法，输出 &quot;syntax is ok&quot; 则配置正常</span></span><br></pre></td></tr></table></figure>
+
+<h4 id="测试负载均衡功能，在-node01-节点或客户端执行-curl-命令"><a href="#测试负载均衡功能，在-node01-节点或客户端执行-curl-命令" class="headerlink" title="测试负载均衡功能，在 node01 节点或客户端执行 curl 命令"></a>测试负载均衡功能，在 node01 节点或客户端执行 curl 命令</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">curl 127.0.0.1</span><br><span class="line"><span class="comment"># 应返回 Web 节点的测试内容，多次执行可观察请求转发情况</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="系统可用性测试"><a href="#系统可用性测试" class="headerlink" title="系统可用性测试"></a>系统可用性测试</h3><h4 id="客户端访问测试"><a href="#客户端访问测试" class="headerlink" title="客户端访问测试"></a>客户端访问测试</h4><p>在同网段的客户端（如本地电脑浏览器、其他虚拟机 ），访问负载均衡器（node01 ）的 IP 地址</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">http://192.168.0.100</span><br></pre></td></tr></table></figure>
+
+<p>预期显示 Hello from NFS Share!（与 Web 节点内容一致 ）。多次刷新页面，可验证负载均衡是否按策略（默认轮询 ）转发请求，也可查看 Nginx 访问日志确认：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cat</span> /var/log/nginx/access.log</span><br></pre></td></tr></table></figure>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a href="http://zfps.asia">Memories White</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="http://zfps.asia/2025/06/09/CentOS7_experiment/">http://zfps.asia/2025/06/09/CentOS7_experiment/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="http://zfps.asia" target="_blank">Memories White's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/%E6%95%99%E7%A8%8B/">教程</a><a class="post-meta__tags" href="/tags/CentOS7/">CentOS7</a><a class="post-meta__tags" href="/tags/%E5%AE%9E%E9%AA%8C/">实验</a></div><div class="post-share"><div class="social-share" data-image="https://t.alcy.cc/fj" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/js/social-share.min.js" defer></script></div></div><div class="post-reward"><div class="reward-button"><i class="fas fa-qrcode"></i>如果觉得文章不错，欢迎打赏支持</div><div class="reward-main"><ul class="reward-all"><li class="reward-item"><a href="/img/wechat.jpg" target="_blank"><img class="post-qr-code-img" src="/img/wechat.jpg" alt="微信"/></a><div class="post-qr-code-desc">微信</div></li><li class="reward-item"><a href="/img/alipay.jpg" target="_blank"><img class="post-qr-code-img" src="/img/alipay.jpg" alt="支付宝"/></a><div class="post-qr-code-desc">支付宝</div></li></ul></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related full-width" href="/2025/04/17/SSL/" title="域名绑定SSL教程"><img class="cover" src="https://t.alcy.cc/fj" onerror="onerror=null;src='/img/404.jpg'" alt="cover of previous post"><div class="info"><div class="info-1"><div class="info-item-1">上一篇</div><div class="info-item-2">域名绑定SSL教程</div></div><div class="info-2"><div class="info-item-1">域名绑定 SSL这里仅演示 Nginx 的配置方法。首先，你需要到阿里云或其他域名服务商购买 SSL 证书。下面会展示阿里云的免费申请步骤，较为简单的申请途径还有 httpsok。 域名 SSL 申请阿里云首先访问这个链接 阿里云 SSL 证书。购买成功后，如下图所示，点击“更多”，在里面下载 Nginx 证书。 httpsok进入 httpsok 官网，注册成功后，直接进入申请免费 SSL 的流程。 输入域名后会进行 DNS 解析，这里的主机记录和记录值需要到 DNS 服务商处设置，一般是 CNAME 记录，就像图中的记录类型一样。之后，从 httpsok 复制主机记录和记录值并粘贴到相应位置，然后点击“提交”即可。 上传证书首先，在服务器上找到 Nginx 的安装路径，这里我的路径是 /etc/nginx/，在 Nginx 目录下创建 cert 文件夹。 1mkdir /etc/nginx/cert  完成以上步骤后，找到你下载好的证书（.zip 格式），压缩包里有两个文件，分别是以 .pem 结尾的证书和以 .key 结尾的密钥。将这两个文件解压出来，上传到服务器。这里以...</div></div></div></a></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><a class="pagination-related" href="/2025/04/16/Hexo-ailiyun/" title="阿里云搭建hexo博客教程"><img class="cover" src="https://tu.ltyuanfang.cn/api/fengjing.php" alt="cover"><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2025-04-16</div><div class="info-item-2">阿里云搭建hexo博客教程</div></div><div class="info-2"><div class="info-item-1">本教程基于 阿里云 Centos7前置条件  阿里云账号    域名    云服务器    本教程会大概告诉你遇到的一些问题、解决方法、注意事项以及相关链接，希望能帮到你。有关服务器购买以及域名的内容，这里只会初略带过，这里跳过服务器购买，直接从域名开始。 域名购买以及备案后首先去解析 DNS 服务，这里以阿里云为例。点击快速添加解析，然后勾选必要选项即可。网站的 IP 地址为你服务器的公网 IP。完成以上操作后，你会看到像上面截图那样多出来两个选项。至此，你的域名就准备完成了。 本地主机配置安装 Node.js浏览器进入 NodeJS 官网，点击下载 Node.js(LTS 版本)安装包。验证 Node.js 是否安装成功：按下 win+r 进入 cmd 窗口，输入 node -v，出现版本号即为安装成功。如果不成功，就需要去环境变量中添加 Node.js 的安装路径，或者重新安装 Node.js。 安装 Hexo在 cmd 窗口输入以下命令安装 Hexo： 1npm install hexo-cli -g  完成后输入 hexo -v...</div></div></div></a><a class="pagination-related" href="/2025/04/17/SSL/" title="域名绑定SSL教程"><img class="cover" src="https://t.alcy.cc/fj" alt="cover"><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2025-04-17</div><div class="info-item-2">域名绑定SSL教程</div></div><div class="info-2"><div class="info-item-1">域名绑定 SSL这里仅演示 Nginx 的配置方法。首先，你需要到阿里云或其他域名服务商购买 SSL 证书。下面会展示阿里云的免费申请步骤，较为简单的申请途径还有 httpsok。 域名 SSL 申请阿里云首先访问这个链接 阿里云 SSL 证书。购买成功后，如下图所示，点击“更多”，在里面下载 Nginx 证书。 httpsok进入 httpsok 官网，注册成功后，直接进入申请免费 SSL 的流程。 输入域名后会进行 DNS 解析，这里的主机记录和记录值需要到 DNS 服务商处设置，一般是 CNAME 记录，就像图中的记录类型一样。之后，从 httpsok 复制主机记录和记录值并粘贴到相应位置，然后点击“提交”即可。 上传证书首先，在服务器上找到 Nginx 的安装路径，这里我的路径是 /etc/nginx/，在 Nginx 目录下创建 cert 文件夹。 1mkdir /etc/nginx/cert  完成以上步骤后，找到你下载好的证书（.zip 格式），压缩包里有两个文件，分别是以 .pem 结尾的证书和以 .key 结尾的密钥。将这两个文件解压出来，上传到服务器。这里以...</div></div></div></a></div></div><hr class="custom-hr"/><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> 评论</span></div><div class="comment-switch"><span class="first-comment">Valine</span><span id="switch-btn"></span><span class="second-comment">Artalk</span></div></div><div class="comment-wrap"><div><div class="vcomment" id="vcomment"></div></div><div><div id="artalk-wrap"></div></div></div></div></div><div class="aside-content" id="aside-content"><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E8%AF%B4%E6%98%8E"><span class="toc-number">1.</span> <span class="toc-text">说明</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#%E5%AE%9E%E9%AA%8C%E5%9B%BE"><span class="toc-number">1.1.</span> <span class="toc-text">实验图</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%AE%9E%E9%AA%8C%E5%87%86%E5%A4%87"><span class="toc-number">2.</span> <span class="toc-text">实验准备</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#%E5%AE%9E%E9%AA%8C%E9%9C%80%E5%87%86%E5%A4%87%E5%9B%9B%E5%8F%B0%E8%99%9A%E6%8B%9F%E6%9C%BA-%E4%BB%A5%E4%B8%8B%E8%A7%86%E6%83%85%E5%86%B5%E8%BF%9B%E8%A1%8C%E6%9B%B4%E6%94%B9"><span class="toc-number">2.1.</span> <span class="toc-text">实验需准备四台虚拟机,以下视情况进行更改.</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Node1-4-%E6%8D%A2%E6%BA%90%E6%93%8D%E4%BD%9C-%E5%B9%B6%E5%85%B3%E9%97%AD%E9%98%B2%E7%81%AB%E5%A2%99"><span class="toc-number">3.</span> <span class="toc-text">Node1-4 换源操作,并关闭防火墙</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#%E5%A4%87%E4%BB%BD%E9%BB%98%E8%AE%A4%E6%BA%90"><span class="toc-number">3.1.</span> <span class="toc-text">备份默认源</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E8%BF%9B%E8%A1%8C%E6%8D%A2%E6%BA%90%E6%93%8D%E4%BD%9C-%E8%BF%99%E9%87%8C%E4%BD%BF%E7%94%A8%E9%98%BF%E9%87%8C%E4%BA%91%E6%BA%90-%E9%9C%80%E8%A6%81%E4%BD%BF%E7%94%A8%E5%85%B6%E4%BB%96%E6%BA%90%E4%B9%9F%E5%8F%AF%E4%BB%A5%E6%8D%A2%E6%88%90%E5%88%AB%E7%9A%84"><span class="toc-number">3.2.</span> <span class="toc-text">进行换源操作,这里使用阿里云源,需要使用其他源也可以换成别的</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E6%B8%85%E7%90%86-yum-%E6%BA%90"><span class="toc-number">3.3.</span> <span class="toc-text">清理 yum 源</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E9%AA%8C%E8%AF%81%E6%98%AF%E5%90%A6%E6%9C%89%E6%95%88"><span class="toc-number">3.4.</span> <span class="toc-text">验证是否有效</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E5%85%B3%E9%97%AD%E9%98%B2%E7%81%AB%E5%A2%99"><span class="toc-number">3.5.</span> <span class="toc-text">关闭防火墙</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Node4-%E6%93%8D%E4%BD%9C"><span class="toc-number">4.</span> <span class="toc-text">Node4 操作</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#%E5%AE%89%E8%A3%85-NFS-%E6%9C%8D%E5%8A%A1"><span class="toc-number">4.1.</span> <span class="toc-text">安装 NFS 服务</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E5%88%9B%E5%BB%BA%E5%85%B1%E4%BA%AB%E7%9B%AE%E5%BD%95%E5%B9%B6%E8%AE%BE%E7%BD%AE%E6%9D%83%E9%99%90"><span class="toc-number">4.2.</span> <span class="toc-text">创建共享目录并设置权限</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E9%85%8D%E7%BD%AE-NFS-%E5%85%B1%E4%BA%AB%E8%A7%84%E5%88%99"><span class="toc-number">4.3.</span> <span class="toc-text">配置 NFS 共享规则</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E5%90%AF%E5%8A%A8%E6%9C%8D%E5%8A%A1%E5%B9%B6%E8%AE%BE%E7%BD%AE%E5%BC%80%E6%9C%BA%E8%87%AA%E5%90%AF"><span class="toc-number">4.4.</span> <span class="toc-text">启动服务并设置开机自启</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E9%AA%8C%E8%AF%81-NFS-%E6%9C%8D%E5%8A%A1%E6%98%AF%E5%90%A6%E7%94%9F%E6%95%88"><span class="toc-number">4.5.</span> <span class="toc-text">验证 NFS 服务是否生效</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Node2-3-%E9%83%A8%E7%BD%B2-Web-%E6%9C%8D%E5%8A%A1%EF%BC%88%E6%95%B0%E6%8D%AE%E5%90%8C%E6%AD%A5%E4%BE%9D%E8%B5%96-NFS-%E6%8C%82%E8%BD%BD-%EF%BC%89"><span class="toc-number">5.</span> <span class="toc-text">Node2-3 部署 Web 服务（数据同步依赖 NFS 挂载 ）</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#%E5%AE%89%E8%A3%85-Nginx-%E6%89%80%E9%9C%80%E8%A6%81%E7%9A%84%E7%8E%AF%E5%A2%83"><span class="toc-number">5.1.</span> <span class="toc-text">安装 Nginx 所需要的环境</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E5%AE%89%E8%A3%85-Nginx"><span class="toc-number">5.2.</span> <span class="toc-text">安装 Nginx</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#Node2-3-%E9%83%A8%E7%BD%B2-Web-%E7%AB%99%E7%82%B9"><span class="toc-number">5.3.</span> <span class="toc-text">Node2-3 部署 Web 站点</span></a><ol class="toc-child"><li class="toc-item toc-level-5"><a class="toc-link" href="#%E6%8C%82%E8%BD%BD-NFS-%E5%85%B1%E4%BA%AB%E7%9B%AE%E5%BD%95"><span class="toc-number">5.3.1.</span> <span class="toc-text">挂载 NFS 共享目录</span></a></li><li class="toc-item toc-level-5"><a class="toc-link" href="#%E5%90%AF%E5%8A%A8-Nginx-%E5%B9%B6%E8%AE%BE%E7%BD%AE%E5%BC%80%E6%9C%BA%E8%87%AA%E5%90%AF"><span class="toc-number">5.3.2.</span> <span class="toc-text">启动 Nginx 并设置开机自启</span></a></li><li class="toc-item toc-level-5"><a class="toc-link" href="#%E9%AA%8C%E8%AF%81%E6%95%B0%E6%8D%AE%E5%90%8C%E6%AD%A5"><span class="toc-number">5.3.3.</span> <span class="toc-text">验证数据同步</span></a></li></ol></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Node1-%E9%83%A8%E7%BD%B2%E8%B4%9F%E8%BD%BD%E5%9D%87%E8%A1%A1%EF%BC%88%E9%87%87%E7%94%A8-Nginx-%E5%8F%8D%E5%90%91%E4%BB%A3%E7%90%86-%EF%BC%89"><span class="toc-number">6.</span> <span class="toc-text">Node1 部署负载均衡（采用 Nginx 反向代理 ）</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#%E5%AE%89%E8%A3%85-Nginx-%E8%BF%99%E9%87%8C%E5%AE%89%E8%A3%85-Nginx-%E5%90%8C%E4%B8%8A%E9%9D%A2%E7%9A%84-Node2-3-%E6%93%8D%E4%BD%9C%E7%9B%B8%E5%90%8C%E6%95%85%E4%B8%8D%E6%BC%94%E7%A4%BA"><span class="toc-number">6.1.</span> <span class="toc-text">安装 Nginx,这里安装 Nginx 同上面的 Node2-3 操作相同故不演示</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E9%85%8D%E7%BD%AE%E8%B4%9F%E8%BD%BD%E5%9D%87%E8%A1%A1%E8%A7%84%E5%88%99"><span class="toc-number">6.2.</span> <span class="toc-text">配置负载均衡规则</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E5%90%AF%E5%8A%A8-Nginx-%E5%B9%B6%E9%AA%8C%E8%AF%81"><span class="toc-number">6.3.</span> <span class="toc-text">启动 Nginx 并验证</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E6%B5%8B%E8%AF%95%E8%B4%9F%E8%BD%BD%E5%9D%87%E8%A1%A1%E5%8A%9F%E8%83%BD%EF%BC%8C%E5%9C%A8-node01-%E8%8A%82%E7%82%B9%E6%88%96%E5%AE%A2%E6%88%B7%E7%AB%AF%E6%89%A7%E8%A1%8C-curl-%E5%91%BD%E4%BB%A4"><span class="toc-number">6.4.</span> <span class="toc-text">测试负载均衡功能，在 node01 节点或客户端执行 curl 命令</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%B3%BB%E7%BB%9F%E5%8F%AF%E7%94%A8%E6%80%A7%E6%B5%8B%E8%AF%95"><span class="toc-number">7.</span> <span class="toc-text">系统可用性测试</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#%E5%AE%A2%E6%88%B7%E7%AB%AF%E8%AE%BF%E9%97%AE%E6%B5%8B%E8%AF%95"><span class="toc-number">7.1.</span> <span class="toc-text">客户端访问测试</span></a></li></ol></li></ol></div></div></div></div></main><footer id="footer" style="background: transparent;"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;2025 By Memories White</span></div><div class="footer_custom_text">By <a target="_blank" rel="noopener" href="https://github.com/yiobai">Memories White</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="translateLink" type="button" title="简繁转换">繁</button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="前往评论"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js"></script><script src="/js/main.js"></script><script src="/js/tw_cn.js"></script><script src="https://cdn.jsdelivr.net/npm/instant.page/instantpage.min.js" type="module"></script><script src="https://cdn.jsdelivr.net/npm/node-snackbar/dist/snackbar.min.js"></script><div class="js-pjax"><script>(() => {
+  const loadMathjax = () => {
+    if (!window.MathJax) {
+      window.MathJax = {
+        tex: {
+          inlineMath: [['$', '$'], ['\\(', '\\)']],
+          tags: 'none',
+        },
+        chtml: {
+          scale: 1.1
+        },
+        options: {
+          enableMenu: true,
+          renderActions: {
+            findScript: [10, doc => {
+              for (const node of document.querySelectorAll('script[type^="math/tex"]')) {
+                const display = !!node.type.match(/; *mode=display/)
+                const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display)
+                const text = document.createTextNode('')
+                node.parentNode.replaceChild(text, node)
+                math.start = {node: text, delim: '', n: 0}
+                math.end = {node: text, delim: '', n: 0}
+                doc.math.push(math)
+              }
+            }, '']
+          }
+        }
+      }
+
+      const script = document.createElement('script')
+      script.src = 'https://cdn.jsdelivr.net/npm/mathjax/es5/tex-mml-chtml.min.js'
+      script.id = 'MathJax-script'
+      script.async = true
+      document.head.appendChild(script)
+    } else {
+      MathJax.startup.document.state(0)
+      MathJax.texReset()
+      MathJax.typesetPromise()
+    }
+  }
+
+  btf.addGlobalFn('encrypt', loadMathjax, 'mathjax')
+  window.pjax ? loadMathjax() : window.addEventListener('load', loadMathjax)
+})()</script><script>(() => {
+  const isShuoshuo = GLOBAL_CONFIG_SITE.pageType === 'shuoshuo'
+  const option = null
+
+  const initValine = (el, path) => {
+    if (isShuoshuo) {
+      window.shuoshuoComment.destroyValine = () => {
+        if (el.children.length) {
+          el.innerHTML = ''
+          el.classList.add('no-comment')
+        }
+      }
+    }
+
+    const valineConfig = {
+      el: '#vcomment',
+      appId: 'qq1wYEvJommck0RSmFefwcTo-gzGzoHsz',
+      appKey: 'GYUimeiB0cT4hRpGf0HITpMm',
+      avatar: '/img/valine-avatar.jpg',
+      serverURLs: '',
+      emojiMaps: "",
+      visitor: true,
+      ...option,
+      path: isShuoshuo ? path : (option && option.path) || window.location.pathname
+    }
+
+    new Valine(valineConfig)
+  }
+
+  const loadValine = async (el, path) => {
+    if (typeof Valine === 'function') {
+      initValine(el, path)
+    } else {
+      await btf.getScript('https://cdn.jsdelivr.net/npm/valine/dist/Valine.min.js')
+      initValine(el, path)
+    }
+  }
+
+  if (isShuoshuo) {
+    'Valine' === 'Valine'
+      ? window.shuoshuoComment = { loadComment: loadValine }
+      : window.loadOtherComment = loadValine
+    return
+  }
+
+  if ('Valine' === 'Valine' || !false) {
+    if (false) btf.loadComment(document.getElementById('vcomment'),loadValine)
+    else setTimeout(loadValine, 0)
+  } else {
+    window.loadOtherComment = loadValine
+  }
+})()</script><script>(() => {
+  let artalkItem = null
+  const option = null
+  const isShuoshuo = GLOBAL_CONFIG_SITE.pageType === 'shuoshuo'
+
+  const destroyArtalk = () => {
+    if (artalkItem) {
+      artalkItem.destroy()
+      artalkItem = null
+    }
+  }
+
+  const artalkChangeMode = theme => artalkItem && artalkItem.setDarkMode(theme === 'dark')
+
+  const initArtalk = (el = document, pageKey = location.pathname) => {
+    artalkItem = Artalk.init({
+      el: el.querySelector('#artalk-wrap'),
+      server: 'artalk',
+      site: 'Memries White 的博客',
+      darkMode: document.documentElement.getAttribute('data-theme') === 'dark',
+      ...option,
+      pageKey: isShuoshuo ? pageKey : (option && option.pageKey) || pageKey
+    })
+
+    if (GLOBAL_CONFIG.lightbox === 'null') return
+    artalkItem.on('list-loaded', () => {
+      artalkItem.ctx.get('list').getCommentNodes().forEach(comment => {
+        const $content = comment.getRender().$content
+        btf.loadLightbox($content.querySelectorAll('img:not([atk-emoticon])'))
+      })
+    })
+
+    if (isShuoshuo) {
+      window.shuoshuoComment.destroyArtalk = () => {
+        destroyArtalk()
+        if (el.children.length) {
+          el.innerHTML = ''
+          el.classList.add('no-comment')
+        }
+      }
+    }
+
+    btf.addGlobalFn('pjaxSendOnce', destroyArtalk, 'destroyArtalk')
+    btf.addGlobalFn('themeChange', artalkChangeMode, 'artalk')
+  }
+
+  const loadArtalk = async (el, pageKey) => {
+    if (typeof Artalk === 'object') initArtalk(el, pageKey)
+    else {
+      await btf.getCSS('https://cdn.jsdelivr.net/npm/artalk/dist/Artalk.min.css')
+      await btf.getScript('https://cdn.jsdelivr.net/npm/artalk/dist/Artalk.min.js')
+      initArtalk(el, pageKey)
+    }
+  }
+
+  if (isShuoshuo) {
+    'Valine' === 'Artalk'
+      ? window.shuoshuoComment = { loadComment: loadArtalk }
+      : window.loadOtherComment = loadArtalk
+    return
+  }
+
+  if ('Valine' === 'Artalk' || !false) {
+    if (false) btf.loadComment(document.getElementById('artalk-wrap'), loadArtalk)
+    else setTimeout(loadArtalk, 100)
+  } else {
+    window.loadOtherComment = loadArtalk
+  }
+})()</script></div><div class="aplayer" data-id="9479764648" data-server="tencent" data-type="playlist"  data-fixed="true" data-theme="#3F51B5"></div><div class="aplayer" data-id="000PeZCQ1i4XVs" data-server="tencent" data-type="artist" data-mutex="true" data-preload="auto" data-theme="#3F51B5"></div><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/activate-power-mode.min.js"></script><script>POWERMODE.colorful = true;
+POWERMODE.shake = true;
+POWERMODE.mobile = true;
+document.body.addEventListener('input', POWERMODE);
+</script><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/aplayer/dist/APlayer.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/aplayer/dist/APlayer.min.js"></script><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/metingjs/dist/Meting.min.js"></script><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>
